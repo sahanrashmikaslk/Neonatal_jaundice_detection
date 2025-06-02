@@ -3,8 +3,6 @@
 
 This project implements a machine learning model to detect potential signs of neonatal jaundice from images of an infant's eyes or skin. It includes a Streamlit web application for easy interaction, allowing users to upload images, use a webcam for snapshots, or utilize a live camera feed for real-time (frame-by-frame) analysis.
 
-**Disclaimer:** ⚠️ This application is a proof-of-concept and for educational/demonstrational purposes only. **It is NOT a medical diagnostic tool.** The predictions made by this tool are not a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of a qualified health provider with any questions you may have regarding a medical condition.
-
 ## Features
 
 *   **Jaundice Detection Model:** Utilizes a Convolutional Neural Network (CNN), specifically MobileNetV3-Small, trained on a dataset of infant images.
