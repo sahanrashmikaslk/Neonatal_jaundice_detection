@@ -14,10 +14,53 @@ This project implements a machine learning model to detect potential signs of ne
     *   Live Camera Feed Detection
 *   **Real-time Feedback:** Displays the predicted class (Normal/Jaundice) and an estimated confidence score.
 
-## Demo 
+## Screenshots
 
-**Example Screenshot:**
-<!-- ![App Screenshot](path/to/your/screenshot.png) -->
+# Upload an Image
+![Upload an Image](./ScreenShots/UploadAnImage.png)
+# Webcam Snapshot
+![Webcam Snapshot](./ScreenShots/WebcamSnapshot.png)
+# Live Feed Detection
+![Live Feed Detection](./ScreenShots/LiveFeedDetection.png)
+
+
+### Training Process Overview 
+
+The model was trained using a Jupyter Notebook `jaundice-detection.ipynb` . The key steps involved in the training pipeline were:
+
+1.  **Environment Setup:** Installation of necessary libraries such as PyTorch, TorchVision, Albumentations, OpenCV, Scikit-learn, and Kaggle API for data download.
+2.  **Data Acquisition & Preparation:**
+    *   The "Jaundice Image Data" dataset was downloaded directly from Kaggle using its API.
+    *   Images were organized into `Normal` and `Jaundice` class folders.
+    *   A preliminary Exploratory Data Analysis (EDA) was performed to understand image counts, and view sample images.
+3.  **Data Augmentation and Preprocessing:**
+    *   **Albumentations** library was used for image transformations.
+    *   **Training augmentations** included: `SmallestMaxSize`, `RandomCrop` (to 224x224), `Rotate`, `HorizontalFlip`, and `RandomBrightnessContrast`.
+    *   **Validation augmentations** included: `SmallestMaxSize` and `CenterCrop` (to 224x224).
+    *   All images were normalized using ImageNet's mean and standard deviation.
+4.  **Dataset and DataLoader Creation:**
+    *   A custom PyTorch `Dataset` class (`EyeJaundiceSet` or similar) was implemented to load images and apply transformations.
+    *   The dataset was split into training and validation sets (e.g., 85% train, 15% validation).
+    *   PyTorch `DataLoaders` were created to efficiently load data in batches for training and validation, handling shuffling for the training set.
+5.  **Model Definition (Transfer Learning):**
+    *   A pre-trained MobileNetV3-Small model (weights from ImageNet) was loaded using `torchvision.models`.
+    *   The final classifier layer of MobileNetV3-Small was replaced with a new `nn.Linear` layer suited for binary classification (outputting 1 logit).
+6.  **Training Configuration:**
+    *   **Loss Function:** `nn.BCEWithLogitsLoss` (Binary Cross-Entropy with Logits) was used, suitable for binary classification with a sigmoid applied implicitly.
+    *   **Optimizer:** `AdamW` optimizer was chosen.
+    *   **Learning Rate Scheduler:** `ReduceLROnPlateau` was implemented to reduce the learning rate if validation loss stagnated.
+7.  **Training Loop:**
+    *   The model was trained for a set number of epochs (e.g., 10-15 epochs).
+    *   In each epoch:
+        *   The model was set to `train()` mode, gradients were calculated, and weights were updated using backpropagation.
+        *   The model was then set to `eval()` mode for validation on the unseen validation set.
+        *   Metrics such as training/validation loss, accuracy, sensitivity (recall for Jaundice), and specificity were calculated and printed.
+8.  **Model Evaluation (Post-Training):**
+    *   (Optional but good practice) Grad-CAM was used to visualize which parts of the image the model focused on for its predictions, ensuring it learned relevant features (e.g., the eye region).
+9.  **Model Saving:**
+    *   The state dictionary of the best performing (or final epoch) model was saved to a `.pt` file (e.g., `jaundice_mobilenetv3.pt`) for later use in inference and the Streamlit application.
+    *   The model was also exported to ONNX format for potential cross-platform deployment.
+
 
 ## Project Structure
 
@@ -138,44 +181,5 @@ This will typically open the application in your default web browser at `http://
 *   **Input Image Size:** 224x224 pixels (RGB)
 *   **Output:** Binary classification (Normal / Jaundice) with a probability score.
 
-*(You can add more details here about training parameters, augmentation, or performance metrics if you wish.)*
 
-## Future Improvements / To-Do
 
-*   [ ] Implement automatic eye region detection and cropping for more focused analysis.
-*   [ ] Explore model quantization (e.g., TensorFlow Lite, ONNX Runtime) for optimized performance.
-*   [ ] Add functionality to save prediction results or generate a report.
-*   [ ] Improve robustness to varying lighting conditions.
-*   [ ] Collect a larger, more diverse dataset for retraining and improved accuracy.
-*   [ ] Conduct more rigorous model evaluation (e.g., cross-validation, detailed metrics beyond accuracy).
-
-## Contributing
-
-Contributions, issues, and feature requests are welcome! Please feel free to check the [issues page](https://github.com/YOUR_USERNAME/YOUR_REPOSITORY_NAME/issues).
-
-*(If you have contribution guidelines, link them here.)*
-
-## License
-
-*(Choose a license for your project. MIT is common for open-source projects. Example below.)*
-
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details (you'll need to create this file if you choose a license).
-
-If you don't want to add a license, you can remove this section or state "All rights reserved."
-
-## Acknowledgements
-
-*   The [Kaggle Jaundice Image Data](https://www.kaggle.com/datasets/aiolapo/jaundice-image-data) dataset providers.
-*   The developers of PyTorch, Streamlit, OpenCV, and Albumentations.
-
----
-
-**Remember to:**
-
-1.  Replace `YOUR_USERNAME/YOUR_REPOSITORY_NAME` with your actual GitHub details.
-2.  Uncomment and fill in the "Demo" section if you add a GIF/screenshot.
-3.  **Crucially, update the "Obtain the Dataset" and "Obtain the Trained Model" sections based on whether you are committing these assets to your repository or not.**
-4.  If you choose a license, create a `LICENSE.md` file in your project root containing the license text (e.g., get the MIT license text from [choosealicense.com](https://choosealicense.com/licenses/mit/)).
-5.  Add a `requirements.txt` file by running `pip freeze > requirements.txt` in your activated `jaundice_env`.
-
-Once you've customized it, commit this `README.md` file to your Git repository and push it to GitHub! It will be the first thing people see and will greatly help them understand and use your project.
