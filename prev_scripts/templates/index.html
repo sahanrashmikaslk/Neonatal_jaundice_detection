@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Neonatal Jaundice Screen</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;max-width:680px;margin:30px auto;text-align:center}
+h1{margin-bottom:12px}
+#video{display:none;margin:auto;border:1px solid #ccc}
+#result{margin:14px 0;font-size:1.4rem;font-weight:600}
+#result .JAUNDICE{color:#e74c3c}
+#result .normal  {color:#27ae60}
+label.btn,input,select,button{margin:6px;padding:6px 12px;border-radius:4px;border:none}
+label.btn{background:#3498db;color:#fff;cursor:pointer}
+input[type=file]{display:none}
+button{background:#2ecc71;color:#fff;cursor:pointer}
+button.stop{background:#e67e22}
+</style>
+</head>
+<body>
+  <h1>Neonatal Jaundice Screen</h1>
+
+  <!-- Camera controls -->
+  Camera:
+  <select id="cams"></select>
+  <button id="toggle">Start webcam</button><br>
+
+  <video id="video" width="320" height="240" autoplay></video><br>
+  <button id="capture" style="display:none">Capture frame</button>
+
+  <p>or</p>
+
+  <!-- Upload still photo -->
+  <label class="btn">Upload photo
+    <input type="file" id="file" accept="image/*">
+  </label>
+
+  <div id="result"><span id="label"></span><span id="prob"></span></div>
+
+  <canvas id="canvas" width="320" height="240" style="display:none"></canvas>
+
+<script>
+const camsel = document.getElementById("cams");
+const video  = document.getElementById("video");
+const toggle = document.getElementById("toggle");
+const capture= document.getElementById("capture");
+const canvas = document.getElementById("canvas");
+const label  = document.getElementById("label");
+const prob   = document.getElementById("prob");
+
+let stream=null;
+
+// ---- list cameras -------------------------------------------------
+navigator.mediaDevices.enumerateDevices().then(devs=>{
+  devs.filter(d=>d.kind==="videoinput")
+      .forEach(d=>camsel.add(new Option(d.label||`cam ${camsel.length}`, d.deviceId)));
+});
+
+// ---- start / stop webcam -----------------------------------------
+toggle.onclick = async ()=>{
+  if(stream){ stopCam(); return; }
+  stream = await navigator.mediaDevices.getUserMedia({video:{deviceId:camsel.value}});
+  video.srcObject = stream; video.style.display="block";
+  capture.style.display="inline-block";
+  toggle.textContent="Stop webcam"; toggle.classList.add("stop");
+};
+
+function stopCam(){
+  stream.getTracks().forEach(t=>t.stop());
+  stream=null; video.style.display="none";
+  capture.style.display="none";
+  toggle.textContent="Start webcam"; toggle.classList.remove("stop");
+  label.textContent=prob.textContent="";
+}
+
+// ---- send JPEG blob to /predict ----------------------------------
+async function sendBlob(blob){
+  const fd = new FormData(); fd.append("file", blob, "frame.jpg");
+  const res = await fetch("/predict", {method:"POST", body:fd});
+  if(!res.ok){ alert("Server error "+res.status); return; }
+  const {label:lbl, prob:p} = await res.json();
+  label.textContent = lbl; label.className = lbl;
+  prob.textContent  = " ("+p+")";
+}
+
+// ---- capture button ----------------------------------------------
+capture.onclick = ()=>{
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video,0,0,320,240);
+  canvas.toBlob(sendBlob,"image/jpeg",0.9);
+};
+
+// ---- file-upload branch ------------------------------------------
+document.getElementById("file").onchange = e=>{
+  const f = e.target.files[0];
+  if(f) sendBlob(f);
+};
+</script>
+</body>
+</html>
