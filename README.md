@@ -17,7 +17,7 @@ This project implements a machine learning model to detect potential signs of ne
 # Upload an Image
 ![Upload an Image](./ScreenShots/UploadAnImage.png)
 # Webcam Snapshot
-![Webcam Snapshot](./ScreenShots/WebcamSnapshot.png)
+![Webcam Snapshot](./ScreenShots/UseWebcamSnapshot.png)
 # Live Feed Detection
 ![Live Feed Detection](./ScreenShots/LiveFeedDetection.png)
 
