@@ -54,7 +54,7 @@ The model was trained using a Jupyter Notebook `jaundice-detection.ipynb` . The 
         *   The model was then set to `eval()` mode for validation on the unseen validation set.
         *   Metrics such as training/validation loss, accuracy, sensitivity (recall for Jaundice), and specificity were calculated and printed.
 8.  **Model Evaluation (Post-Training):**
-    *   (Optional but good practice) Grad-CAM was used to visualize which parts of the image the model focused on for its predictions, ensuring it learned relevant features (e.g., the eye region).
+    *   Grad-CAM was used to visualize which parts of the image the model focused on for its predictions, ensuring it learned relevant features (e.g., the eye region).
 9.  **Model Saving:**
     *   The state dictionary of the best performing (or final epoch) model was saved to a `.pt` file (e.g., `jaundice_mobilenetv3.pt`) for later use in inference and the Streamlit application.
     *   The model was also exported to ONNX format for potential cross-platform deployment.
