@@ -1,5 +1,5 @@
 
-# Neonatal Jaundice Detection via Image Analysis
+# Neonatal Jaundice Detection via CNN + MobileNetV3-Small + Streamlit
 
 This project implements a machine learning model to detect potential signs of neonatal jaundice from images of an infant's eyes or skin. It includes a Streamlit web application for easy interaction, allowing users to upload images, use a webcam for snapshots, or utilize a live camera feed for real-time (frame-by-frame) analysis.
 
@@ -133,16 +133,6 @@ The model was trained on the [Kaggle Jaundice Image Data](https://www.kaggle.com
     └── Normal/
     ```
 
-### 5. Obtain the Trained Model (If not included)
-
-*(This section is crucial if you did not commit your `.pt` model file, or if users need to train it themselves)*
-
-The pre-trained model file (`jaundice_mobilenetv3.pt` or similar) should be present in the root directory.
-*   **If provided in the repository:** Ensure `jaundice_mobilenetv3.pt` is in the project root.
-*   **If you need to provide it separately (e.g., via a download link for large models):**
-    "Download the pre-trained model file (`jaundice_mobilenetv3.pt`) from [LINK_TO_YOUR_MODEL_HOSTING] and place it in the root directory of this project."
-*   **If users need to train the model:**
-    "To train the model from scratch, refer to the Jupyter Notebooks or Python scripts used for training (you might want to add these to the repo or link to them if they are elsewhere). Once trained, save the model state dictionary as `jaundice_mobilenetv3.pt` in the project root."
 
 ## Running the Application
 
