@@ -1,4 +1,7 @@
+#ignaore kaggle dataset
 /.kaggle
+
+# Ignore Jaundice environment files
 jaundice-env
 /data
 __pycache__/
@@ -7,15 +10,7 @@ __pycache__/
 *.log
 
 
-# Python bytecode files
-*.py[cod]
-
 # Virtual environment directories
 venv/
 # Distribution / packaging
 build/
-
-
-# PyInstaller
-
-#  PyInstaller creates a build/ and a dist/ directory.
