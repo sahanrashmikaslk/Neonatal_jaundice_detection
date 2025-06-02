@@ -3,24 +3,15 @@
 
 This project implements a machine learning model to detect potential signs of neonatal jaundice from images of an infant's eyes or skin. It includes a Streamlit web application for easy interaction, allowing users to upload images, use a webcam for snapshots, or utilize a live camera feed for real-time (frame-by-frame) analysis.
 
-## Features
+## Model Details
 
-*   **Jaundice Detection Model:** Utilizes a Convolutional Neural Network (CNN), specifically MobileNetV3-Small, trained on a dataset of infant images.
-*   **Streamlit Web Interface:** Provides an easy-to-use UI with multiple input methods:
-    *   Image Upload
-    *   Webcam Snapshot
-    *   Live Camera Feed Detection
-*   **Real-time Feedback:** Displays the predicted class (Normal/Jaundice) and an estimated confidence score.
-
-## Screenshots
-
-# Upload an Image
-![Upload an Image](./ScreenShots/UploadAnImage.png)
-# Webcam Snapshot
-![Webcam Snapshot](./ScreenShots/UseWebcamSnapshot.png)
-# Live Feed Detection
-![Live Feed Detection](./ScreenShots/LiveFeedDetection.png)
-
+*   **Architecture:** MobileNetV3-Small (fine-tuned)
+*   **Framework:** PyTorch
+*   **Training Data:** [Kaggle Jaundice Image Data](https://www.kaggle.com/datasets/aiolapo/jaundice-image-data)
+    *   Approx. 200 Jaundiced images
+    *   Approx. 560 Normal images
+*   **Input Image Size:** 224x224 pixels (RGB)
+*   **Output:** Binary classification (Normal / Jaundice) with a probability score.
 
 ### Training Process Overview 
 
@@ -58,6 +49,26 @@ The model was trained using a Jupyter Notebook `jaundice-detection.ipynb` . The 
 9.  **Model Saving:**
     *   The state dictionary of the best performing (or final epoch) model was saved to a `.pt` file (e.g., `jaundice_mobilenetv3.pt`) for later use in inference and the Streamlit application.
     *   The model was also exported to ONNX format for potential cross-platform deployment.
+
+
+## Features
+
+*   **Jaundice Detection Model:** Utilizes a Convolutional Neural Network (CNN), specifically MobileNetV3-Small, trained on a dataset of infant images.
+*   **Streamlit Web Interface:** Provides an easy-to-use UI with multiple input methods:
+    *   Image Upload
+    *   Webcam Snapshot
+    *   Live Camera Feed Detection
+*   **Real-time Feedback:** Displays the predicted class (Normal/Jaundice) and an estimated confidence score.
+
+## Screenshots
+
+# Upload an Image
+![Upload an Image](./ScreenShots/UploadAnImage.png)
+# Webcam Snapshot
+![Webcam Snapshot](./ScreenShots/UseWebcamSnapshot.png)
+# Live Feed Detection
+![Live Feed Detection](./ScreenShots/LiveFeedDetection.png)
+
 
 
 ## Project Structure
@@ -158,16 +169,6 @@ This will typically open the application in your default web browser at `http://
 *   Ensure good, consistent lighting on the subject's eye or skin.
 *   Try to get a clear, focused image/video of the sclera (white part of the eye) if possible.
 *   Minimize movement during live detection.
-
-## Model Details
-
-*   **Architecture:** MobileNetV3-Small (fine-tuned)
-*   **Framework:** PyTorch
-*   **Training Data:** [Kaggle Jaundice Image Data](https://www.kaggle.com/datasets/aiolapo/jaundice-image-data)
-    *   Approx. 200 Jaundiced images
-    *   Approx. 560 Normal images
-*   **Input Image Size:** 224x224 pixels (RGB)
-*   **Output:** Binary classification (Normal / Jaundice) with a probability score.
 
 
 
