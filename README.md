@@ -1,174 +1,291 @@
+# Advanced Neonatal Jaundice Detection System
 
-# Neonatal Jaundice Detection via CNN + MobileNetV3-Small + Streamlit
+## Project Overview
 
-This project implements a machine learning model to detect potential signs of neonatal jaundice from images of an infant's eyes or skin. It includes a Streamlit web application for easy interaction, allowing users to upload images, use a webcam for snapshots, or utilize a live camera feed for real-time (frame-by-frame) analysis.
+This project implements a state-of-the-art machine learning system for detecting neonatal jaundice from images of infant eyes or skin. The system features a **lighting-robust** deep learning model combined with an intuitive Streamlit web application, providing reliable detection even under challenging lighting conditions.
 
-## Model Details
+### Key Innovation: Lighting-Robust Detection
 
-*   **Architecture:** MobileNetV3-Small (fine-tuned)
-*   **Framework:** PyTorch
-*   **Training Data:** [Kaggle Jaundice Image Data](https://www.kaggle.com/datasets/aiolapo/jaundice-image-data)
-    *   Approx. 200 Jaundiced images
-    *   Approx. 560 Normal images
-*   **Input Image Size:** 224x224 pixels (RGB)
-*   **Output:** Binary classification (Normal / Jaundice) with a probability score.
+Unlike traditional models that may produce false positives in poor lighting, our system includes:
 
-### Training Process Overview 
+- **Automatic brightness detection** to identify low-light conditions
+- **Adaptive confidence scoring** that reduces reliability when lighting is insufficient
+- **Enhanced image processing** using CLAHE (Contrast Limited Adaptive Histogram Equalization)
+- **"Too Dark" classification** to prevent false diagnoses in inadequate lighting
 
-The model was trained using a Jupyter Notebook `jaundice-detection.ipynb` . The key steps involved in the training pipeline were:
+## Model Architecture & Performance
 
-1.  **Environment Setup:** Installation of necessary libraries such as PyTorch, TorchVision, Albumentations, OpenCV, Scikit-learn, and Kaggle API for data download.
-2.  **Data Acquisition & Preparation:**
-    *   The "Jaundice Image Data" dataset was downloaded directly from Kaggle using its API.
-    *   Images were organized into `Normal` and `Jaundice` class folders.
-    *   A preliminary Exploratory Data Analysis (EDA) was performed to understand image counts, and view sample images.
-3.  **Data Augmentation and Preprocessing:**
-    *   **Albumentations** library was used for image transformations.
-    *   **Training augmentations** included: `SmallestMaxSize`, `RandomCrop` (to 224x224), `Rotate`, `HorizontalFlip`, and `RandomBrightnessContrast`.
-    *   **Validation augmentations** included: `SmallestMaxSize` and `CenterCrop` (to 224x224).
-    *   All images were normalized using ImageNet's mean and standard deviation.
-4.  **Dataset and DataLoader Creation:**
-    *   A custom PyTorch `Dataset` class (`EyeJaundiceSet` or similar) was implemented to load images and apply transformations.
-    *   The dataset was split into training and validation sets (e.g., 85% train, 15% validation).
-    *   PyTorch `DataLoaders` were created to efficiently load data in batches for training and validation, handling shuffling for the training set.
-5.  **Model Definition (Transfer Learning):**
-    *   A pre-trained MobileNetV3-Small model (weights from ImageNet) was loaded using `torchvision.models`.
-    *   The final classifier layer of MobileNetV3-Small was replaced with a new `nn.Linear` layer suited for binary classification (outputting 1 logit).
-6.  **Training Configuration:**
-    *   **Loss Function:** `nn.BCEWithLogitsLoss` (Binary Cross-Entropy with Logits) was used, suitable for binary classification with a sigmoid applied implicitly.
-    *   **Optimizer:** `AdamW` optimizer was chosen.
-    *   **Learning Rate Scheduler:** `ReduceLROnPlateau` was implemented to reduce the learning rate if validation loss stagnated.
-7.  **Training Loop:**
-    *   The model was trained for a set number of epochs (e.g., 10-15 epochs).
-    *   In each epoch:
-        *   The model was set to `train()` mode, gradients were calculated, and weights were updated using backpropagation.
-        *   The model was then set to `eval()` mode for validation on the unseen validation set.
-        *   Metrics such as training/validation loss, accuracy, sensitivity (recall for Jaundice), and specificity were calculated and printed.
-8.  **Model Evaluation (Post-Training):**
-    *   Grad-CAM was used to visualize which parts of the image the model focused on for its predictions, ensuring it learned relevant features (e.g., the eye region).
-9.  **Model Saving:**
-    *   The state dictionary of the best performing (or final epoch) model was saved to a `.pt` file (e.g., `jaundice_mobilenetv3.pt`) for later use in inference and the Streamlit application.
-    *   The model was also exported to ONNX format for potential cross-platform deployment.
+### Core Model Details
 
+- **Architecture:** MobileNetV3-Small (fine-tuned for medical imaging)
+- **Framework:** PyTorch with ONNX compatibility for deployment
+- **Training Data:** [Kaggle Jaundice Image Data](https://www.kaggle.com/datasets/aiolapo/jaundice-image-data)
+  - ~200 Jaundice cases
+  - ~560 Normal cases
+- **Input:** 224×224 RGB images
+- **Output:** Binary classification (Normal/Jaundice) with confidence scores
 
-## Features
+### Enhanced Features
 
-*   **Jaundice Detection Model:** Utilizes a Convolutional Neural Network (CNN), specifically MobileNetV3-Small, trained on a dataset of infant images.
-*   **Streamlit Web Interface:** Provides an easy-to-use UI with multiple input methods:
-    *   Image Upload
-    *   Webcam Snapshot
-    *   Live Camera Feed Detection
-*   **Real-time Feedback:** Displays the predicted class (Normal/Jaundice) and an estimated confidence score.
+- **Dual Model System:** Base model + Lighting-robust wrapper
+- **Brightness Threshold:** Configurable detection of dark images (default: 35-70 brightness units)
+- **Confidence Levels:** Full confidence (1.0) for good lighting, reduced (0.7) for low light
+- **ONNX Export:** Ready for Raspberry Pi and edge device deployment
 
-## Screenshots
+## Training Process Deep Dive
 
-# Upload an Image
-![Upload an Image](./ScreenShots/UploadAnImage.png)
-# Webcam Snapshot
-![Webcam Snapshot](./ScreenShots/UseWebcamSnapshot.png)
-# Live Feed Detection
-![Live Feed Detection](./ScreenShots/LiveFeedDetection.png)
+The model training pipeline (implemented in `jaundice-detection.ipynb`) includes:
 
+### 1. **Data Acquisition & EDA**
 
+```python
+# Automated Kaggle dataset download
+!kaggle datasets download -d aiolapo/jaundice-image-data
+```
+
+- Comprehensive exploratory data analysis
+- Class distribution visualization
+- Sample image inspection
+
+### 2. **Custom Dataset Implementation**
+
+```python
+class EyeJaundiceSet(Dataset):
+    # Handles RGB conversion, resizing, augmentation
+    # 85/15 train/validation split with reproducible seeding
+```
+
+### 3. **Transfer Learning Setup**
+
+- Pre-trained MobileNetV3-Small with ImageNet weights
+- Custom binary classification head
+- BCEWithLogitsLoss for stable training
+- AdamW optimizer with ReduceLROnPlateau scheduling
+
+### 4. **Advanced Training Loop**
+
+- 10-epoch training with comprehensive metrics
+- Windows-compatible DataLoader (num_workers=0)
+- Real-time accuracy, sensitivity, and specificity tracking
+- Progress bars with tqdm integration
+
+### 5. **Lighting-Robust Enhancement**
+
+```python
+class LightingRobustJaundiceModel:
+    def __init__(self, base_model, brightness_threshold=70):
+        # Wrapper that adds lighting awareness to base model
+
+    def is_dark_image(self, image):
+        # Calculates average brightness in grayscale
+
+    def enhance_image(self, image):
+        # CLAHE enhancement for low-light conditions
+```
+
+### 6. **Model Evaluation & Validation**
+
+- Comparative analysis: Base model vs. Lighting-robust model
+- False positive rate reduction measurement
+- Dark image detection statistics
+- Comprehensive metric reporting (accuracy, sensitivity, specificity)
+
+### 7. **Export & Deployment**
+
+- **PyTorch Format:** `jaundice_mobilenetv3_robust.pt` (includes all robust parameters)
+- **ONNX Format:** `jaundice_mobilenetv3_robust.onnx` (cross-platform compatibility)
+- Embedded model parameters (brightness thresholds, normalization constants)
+
+## Advanced Streamlit Application
+
+### Core Features
+
+- **Multi-Input Support:** File upload, webcam snapshot, live feed
+- **Real-time Analysis:** Frame-by-frame processing for live detection
+- **Intelligent Feedback:** Color-coded results with confidence indicators
+- **Model Parameter Display:** Transparency in model configuration
+
+### Lighting-Aware Interface
+
+```python
+def display_prediction_text(predicted_class, probability, brightness, confidence):
+    if predicted_class == "Too Dark":
+        # Orange warning for insufficient lighting
+    elif predicted_class == "Jaundice":
+        # Red alert with reliability indicator
+    else:  # Normal
+        # Green confirmation with confidence metrics
+```
+
+### Live Feed Enhancements
+
+- **Background Processing:** Non-blocking live detection
+- **Visual Overlays:** Real-time brightness and reliability indicators
+- **Smooth State Management:** Proper camera resource handling
+- **Performance Optimized:** Efficient frame processing pipeline
 
 ## Project Structure
 
 ```
-.
-├── jaundice_env/           # Python virtual environment (excluded by .gitignore)
-├── data/                   # (Optional) Dataset images (likely excluded by .gitignore)
-├── app.py                  # Main Streamlit application script
-├── jaundice_mobilenetv3.pt # Trained PyTorch model file (or similar name)
-├── requirements.txt        # Python package dependencies
-├── .gitignore              # Specifies intentionally untracked files
-└── README.md               # This file
+Neonatal_jaundice_detection/
+├── jaundice-detection.ipynb          # Complete training pipeline
+├── app.py                           # Enhanced Streamlit application
+├── requirements.txt                 # Python package dependencies
+├── jaundice_mobilenetv3.pt          # Base model weights
+├── jaundice_mobilenetv3_robust.pt   # Lighting-robust model
+├── jaundice_mobilenetv3.onnx         # Base ONNX export
+├── jaundice_mobilenetv3_robust.onnx  # Robust ONNX export
+├── data/                            # Training dataset
+│   ├── jaundice-image-data.zip
+│   ├── jaundice/                       # Positive cases
+│   └── normal/                         # Negative cases
+├── jaundice-env/                    # Virtual environment
+├── ScreenShots/                     # Application demos
+├── prev_script/                     # Development history
+└── README.md                        # This documentation
 ```
 
-## Setup and Installation
-
-Follow these steps to set up the project environment and run the application locally.
+## Quick Start Guide
 
 ### Prerequisites
 
-*   Python 3.8+
-*   Git
-*   Access to a webcam (for webcam and live feed features)
+- Python 3.8+
+- CUDA-compatible GPU (optional, CPU supported)
+- Webcam access for live features
 
-### 1. Clone the Repository
+### Installation
 
 ```bash
+# Clone repository
 git clone https://github.com/sahanrashmikaslk/Neonatal_jaundice_detection.git
 cd Neonatal_jaundice_detection
-```
 
+# Create virtual environment
+python -m venv jaundice-env
+# Windows
+.\jaundice-env\Scripts\activate
+# Linux/macOS
+source jaundice-env/bin/activate
 
-### 2. Create and Activate a Virtual Environment
-
-It's highly recommended to use a virtual environment to manage project dependencies.
-
-**Linux/macOS:**
-```bash
-python3 -m venv jaundice_env
-source jaundice_env/bin/activate
-```
-
-**Windows (Git Bash or PowerShell):**
-```bash
-python -m venv jaundice_env
-.\jaundice_env\Scripts\activate
-```
-
-### 3. Install Dependencies
-
-Install the required Python packages using the `requirements.txt` file:
-```bash
+# Install dependencies
 pip install -r requirements.txt
-```
 
-### 4. Obtain the Dataset (If not included)
-
-
-The model was trained on the [Kaggle Jaundice Image Data](https://www.kaggle.com/datasets/aiolapo/jaundice-image-data).
-1.  Download the dataset from Kaggle.
-2.  Ensure you have the Kaggle API token set up (`~/.kaggle/kaggle.json` or `C:\Users\<YourUser>\.kaggle\kaggle.json`).
-3.  Download and extract the data into a `data/` directory in the project root:
-    ```bash
-    # Make sure your Kaggle API token is configured
-    mkdir data
-    kaggle datasets download -d aiolapo/jaundice-image-data -p ./data --unzip
-    ```
-    The expected structure within `data/` is:
-    ```
-    data/
-    ├── Jaundice/
-    └── Normal/
-    ```
-
-
-## Running the Application
-
-Once the setup is complete, you can run the Streamlit web application:
-
-```bash
+# Launch application
 streamlit run app.py
 ```
 
-This will typically open the application in your default web browser at `http://localhost:8501`.
+### For Training/Development
 
-## How to Use
+```bash
+# Setup Kaggle API (place kaggle.json in .kaggle folder)
+# Open jaundice-detection.ipynb in Jupyter/VS Code
+# Run all cells to reproduce training process
+```
 
-1.  Launch the application using the command above.
-2.  Select an input method from the sidebar:
-    *   **Upload an Image:** Browse and select an image file (jpg, png, jpeg).
-    *   **Use Webcam Snapshot:** Allow webcam access, position the subject, and click "Take a picture".
-    *   **Live Feed Detection:** Allow webcam access, click "Start Live Detection". The app will continuously analyze frames. Click "Stop Live Detection" to end.
-3.  Click the "Analyze" button (for uploads/snapshots) or observe the live feed.
-4.  The prediction ("Normal" or "Jaundice") along with a confidence score will be displayed.
+## Application Interface
 
-**Tips for Best Results (especially for webcam/live feed):**
-*   Ensure good, consistent lighting on the subject's eye or skin.
-*   Try to get a clear, focused image/video of the sclera (white part of the eye) if possible.
-*   Minimize movement during live detection.
+### Upload Analysis
 
+- Support for JPG, PNG, JPEG formats
+- Instant brightness assessment
+- Detailed confidence reporting
 
+### Webcam Integration
+
+- Real-time camera access
+- Snapshot analysis with lighting validation
+- User-friendly capture interface
+
+### Live Feed Detection
+
+- Continuous frame-by-frame analysis
+- Real-time brightness monitoring
+- Visual reliability indicators
+- Smooth start/stop controls
+
+## Usage Best Practices
+
+### For Optimal Results
+
+1. **Lighting:** Ensure adequate, even illumination
+2. **Focus:** Target the sclera (white part) of the eye
+3. **Stability:** Minimize movement during capture
+4. **Distance:** Maintain appropriate camera distance
+
+### Understanding Outputs
+
+- **"Normal":** No jaundice detected (Green indicator)
+- **"Jaundice":** Potential jaundice detected (Red indicator)
+- **"Too Dark":** Insufficient lighting (Orange warning)
+- **Reliability Score:** Confidence level based on lighting conditions
+
+## Technical Innovations
+
+### Brightness-Aware Prediction
+
+```python
+def make_prediction_on_frame(model, frame, model_params):
+    brightness = check_image_brightness(frame)
+    if brightness < brightness_threshold:
+        return "Too Dark", 0, brightness, 0.0
+    # Continue with normal prediction...
+```
+
+### Adaptive Confidence Scoring
+
+- **Full Confidence (1.0):** Good lighting conditions
+- **Reduced Confidence (0.7):** Low light but analyzable
+- **No Confidence (0.0):** Too dark for reliable analysis
+
+### CLAHE Enhancement
+
+- Contrast Limited Adaptive Histogram Equalization
+- Improves visibility in challenging lighting
+- Maintains color accuracy for medical assessment
+
+## Deployment Options
+
+### Local Development
+
+- Streamlit application for research and testing
+- Full model transparency and parameter access
+
+### Production Deployment
+
+- ONNX models for cross-platform compatibility
+- Raspberry Pi ready for edge deployment
+- Lightweight inference pipeline
+
+### Clinical Integration
+
+- API-ready model structure
+- Standardized input/output formats
+- Comprehensive logging and audit trails
+
+## Performance Metrics
+
+The lighting-robust model demonstrates:
+
+- **Improved Specificity:** Reduced false positive rates in low light
+- **Maintained Sensitivity:** Preserved detection capability
+- **Enhanced Reliability:** Transparent confidence scoring
+- **Real-world Robustness:** Handles varying lighting conditions
+
+## Contributing
+
+This project welcomes contributions in:
+
+- Model architecture improvements
+- Additional data augmentation techniques
+- Enhanced user interface features
+- Clinical validation studies
+- Performance optimization
+
+## Medical Disclaimer
+
+This system is designed for **research and educational purposes**. It should not replace professional medical diagnosis. Always consult qualified healthcare providers for medical decisions regarding neonatal jaundice.
+
+## Contact & Support
+
+For questions, issues, or collaboration opportunities, please reach out through the project repository or contact the development team.
 
