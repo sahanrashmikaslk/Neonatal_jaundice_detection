@@ -190,11 +190,15 @@ streamlit run app.py
 - Instant brightness assessment
 - Detailed confidence reporting
 
+![Upload an Image](./ScreenShots/UploadAnImage.png)
+
 ### Webcam Integration
 
 - Real-time camera access
 - Snapshot analysis with lighting validation
 - User-friendly capture interface
+
+![Webcam Snapshot](./ScreenShots/UseWebcamSnapshot.png)
 
 ### Live Feed Detection
 
@@ -202,6 +206,8 @@ streamlit run app.py
 - Real-time brightness monitoring
 - Visual reliability indicators
 - Smooth start/stop controls
+
+![Live Feed Detection](./ScreenShots/LiveFeedDetection.png)
 
 ## Usage Best Practices
 
@@ -288,4 +294,3 @@ This system is designed for **research and educational purposes**. It should not
 ## Contact & Support
 
 For questions, issues, or collaboration opportunities, please reach out through the project repository or contact the development team.
-
