@@ -1,0 +1,17 @@
+#ignaore kaggle dataset
+/.kaggle
+
+# Ignore Jaundice environment files
+jaundice-env
+/data
+__pycache__/
+*.pyc
+.env
+*.log
+prev_scripts
+
+
+# Virtual environment directories
+venv/
+# Distribution / packaging
+build/

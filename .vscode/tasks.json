@@ -1,0 +1,13 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Restart and Run Jupyter Notebook",
+			"type": "shell",
+			"command": "jupyter notebook \"c:\\Users\\sahan\\Desktop\\MYProjects\\Neonatal_jaundice_detection-withRaspberryPI\\jaundice-detection.ipynb\"",
+			"group": "test",
+			"isBackground": true,
+			"problemMatcher": []
+		}
+	]
+}
