@@ -338,9 +338,16 @@ async def perform_detection():
         # Store last result
         last_detection_result = result
         
-        # Publish to ThingsBoard if available
-        if tb_client and tb_client.enabled and result.get('status') == 'success':
-            tb_client.publish_jaundice_data(result)
+        # Publish to ThingsBoard if available - publish every 10 minutes regardless of detection result
+        if tb_client and tb_client.enabled:
+            # Try to reconnect if not connected
+            if not tb_client.connected:
+                logger.info("🔄 ThingsBoard not connected, attempting to reconnect...")
+                tb_client.connect()
+            
+            # Publish if connected or result was successful
+            if tb_client.connected or result.get('status') == 'success':
+                tb_client.publish_jaundice_data(result)
         
         return result
         
@@ -465,9 +472,16 @@ async def detect_jaundice():
         global last_detection_result
         last_detection_result = result
         
-        # Publish to ThingsBoard if available
-        if tb_client and tb_client.enabled and result.get('status') == 'success':
-            tb_client.publish_jaundice_data(result)
+        # Publish to ThingsBoard if available - publish every detection regardless of result
+        if tb_client and tb_client.enabled:
+            # Try to reconnect if not connected
+            if not tb_client.connected:
+                logger.info("🔄 ThingsBoard not connected, attempting to reconnect...")
+                tb_client.connect()
+            
+            # Publish if connected or result was successful
+            if tb_client.connected or result.get('status') == 'success':
+                tb_client.publish_jaundice_data(result)
         
         return JSONResponse(content=result)
         
