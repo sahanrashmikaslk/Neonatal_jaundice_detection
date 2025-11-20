@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Jaundice Detection Server for Pi Monitoring System
+Jaundice Detection Server for Pi Monitoring System (WITH BABY PRESENCE DETECTION)
 FastAPI server that provides jaundice detection from camera stream
 With automatic detection every 10 minutes and ThingsBoard integration
+NOW WITH: Baby presence gate to prevent false positives
 """
 
 import torch
@@ -64,7 +65,7 @@ except Exception as e:
     TB_PORT = None
     ACCESS_TOKEN = None
 
-app = FastAPI(title="Jaundice Detection API", version="1.0.0")
+app = FastAPI(title="Jaundice Detection API", version="2.0.0")
 
 # Enable CORS
 app.add_middleware(
@@ -78,10 +79,10 @@ app.add_middleware(
 # Global variables
 model = None
 model_params = {}
+baby_detector = None
 last_detection_result = None
 auto_detection_task = None
 tb_client = None
-baby_detector = None
 
 # --- Model Definition ---
 def get_model_architecture():
@@ -144,7 +145,7 @@ class ThingsBoardClient:
             return False
     
     def publish_jaundice_data(self, detection_result):
-        """Publish jaundice detection data to ThingsBoard"""
+        """Publish jaundice detection data to ThingsBoard with baby presence info"""
         if not self.enabled:
             return False
         
@@ -156,7 +157,7 @@ class ThingsBoardClient:
                 return False
         
         try:
-            # Prepare telemetry data
+            # Prepare telemetry data with baby presence metrics
             telemetry = {
                 'jaundice_detected': detection_result.get('jaundice_detected', False),
                 'jaundice_confidence': round(detection_result.get('confidence', 0) * 100, 2),
@@ -164,7 +165,12 @@ class ThingsBoardClient:
                 'jaundice_brightness': round(detection_result.get('brightness', 0), 2),
                 'jaundice_status': detection_result.get('predicted_class', 'Unknown'),
                 'jaundice_reliability': round(detection_result.get('reliability', 1.0) * 100, 2),
+                # NEW: Baby presence metrics
                 'baby_present': detection_result.get('baby_present', False),
+                'baby_face_count': detection_result.get('face_count', 0),
+                'baby_skin_ratio': round(detection_result.get('skin_ratio', 0) * 100, 2),
+                'baby_face_area_ratio': round(detection_result.get('max_face_area_ratio', 0) * 100, 2),
+                'baby_detection_reason': detection_result.get('baby_reason', ''),
                 'timestamp': int(time.time() * 1000)
             }
             
@@ -250,13 +256,13 @@ def check_image_brightness(image_bgr):
     brightness = np.mean(gray)
     return brightness
 
-# --- Prediction Function ---
+# --- Prediction Function WITH BABY PRESENCE GATE ---
 def make_prediction(frame_bgr):
-    """Make jaundice prediction on a frame"""
+    """Make jaundice prediction on a frame with baby presence gate"""
     if model is None:
         return None
     
-    # Check brightness
+    # Check brightness first
     brightness = check_image_brightness(frame_bgr)
     
     # Get brightness threshold from model parameters or use default
@@ -279,29 +285,51 @@ def make_prediction(frame_bgr):
             "brightness": float(brightness),
             "reliability": 0.0,
             "baby_present": False,
+            "face_count": 0,
+            "skin_ratio": 0.0,
+            "max_face_area_ratio": 0.0,
+            "baby_reason": "image too dark",
             "message": "Image too dark. Please use better lighting."
         }
     
-    # Baby presence gate - check if baby is visible
+    # For low light conditions, reduce confidence
+    if brightness < low_light_threshold:
+        confidence = 0.7
+    
+    # NEW: Check for baby presence
     if baby_detector is not None:
-        presence_result = baby_detector.is_baby_present(frame_bgr)
+        presence_result: PresenceResult = baby_detector.is_baby_present(frame_bgr)
+        
         if not presence_result.is_present:
-            logger.info(f"⚠️ No baby detected ({presence_result.reason}). Skipping jaundice detection.")
+            logger.info(f"⚠️ No baby detected: {presence_result.reason}")
             return {
                 "status": "no_baby",
                 "jaundice_detected": False,
                 "confidence": 0.0,
                 "probability": 0.0,
                 "brightness": float(brightness),
-                "reliability": 100.0,
+                "reliability": 0.0,
                 "baby_present": False,
+                "face_count": presence_result.face_count,
+                "skin_ratio": float(presence_result.skin_ratio),
+                "max_face_area_ratio": float(presence_result.max_face_area_ratio),
+                "baby_reason": presence_result.reason,
                 "message": f"No baby detected ({presence_result.reason}). Skipping jaundice detection."
             }
-        logger.info(f"✓ Baby detected (faces={presence_result.face_count}, skin={presence_result.skin_ratio:.2%})")
-    
-    # For low light conditions, reduce confidence
-    if brightness < low_light_threshold:
-        confidence = 0.7
+        else:
+            logger.info(f"✓ Baby present: {presence_result.face_count} face(s), "
+                       f"{presence_result.skin_ratio:.2%} skin, "
+                       f"{presence_result.max_face_area_ratio:.2%} face area")
+    else:
+        # If baby detector not available, create dummy result
+        logger.warning("⚠️ Baby detector not initialized, skipping presence check")
+        presence_result = PresenceResult(
+            is_present=True,
+            face_count=0,
+            max_face_area_ratio=0.0,
+            skin_ratio=0.0,
+            reason="detector not available"
+        )
     
     # Preprocess and get model prediction
     img_tensor = preprocess_frame(frame_bgr)
@@ -320,7 +348,12 @@ def make_prediction(frame_bgr):
         "probability": float(probability_jaundice),
         "brightness": float(brightness),
         "reliability": float(confidence),
-        "baby_present": True,
+        # Baby presence metrics
+        "baby_present": presence_result.is_present,
+        "face_count": presence_result.face_count,
+        "skin_ratio": float(presence_result.skin_ratio),
+        "max_face_area_ratio": float(presence_result.max_face_area_ratio),
+        "baby_reason": presence_result.reason,
         "message": f"{predicted_class} detected" if confidence >= 1.0 else f"{predicted_class} detected (low light may affect accuracy)"
     }
     
@@ -344,7 +377,7 @@ async def perform_detection():
             logger.error("Failed to capture frame from camera")
             return None
         
-        # Make prediction
+        # Make prediction (with baby presence gate)
         result = make_prediction(frame)
         
         if result is None:
@@ -354,8 +387,14 @@ async def perform_detection():
         result["timestamp"] = datetime.now().isoformat()
         result["detection_type"] = "auto"  # Mark as automatic detection
         
-        logger.info(f"✓ Detection result: {result.get('predicted_class', result.get('status'))} "
-                   f"(confidence: {result['confidence']:.2%}, brightness: {result['brightness']:.1f})")
+        # Log result with baby presence info
+        if result.get('baby_present'):
+            logger.info(f"✓ Detection result: {result.get('predicted_class', result.get('status'))} "
+                       f"(confidence: {result['confidence']:.2%}, brightness: {result['brightness']:.1f}, "
+                       f"baby: ✓, faces: {result['face_count']}, skin: {result['skin_ratio']:.2%})")
+        else:
+            logger.info(f"⚠️ Detection skipped: {result.get('baby_reason')} "
+                       f"(faces: {result['face_count']}, skin: {result['skin_ratio']:.2%})")
         
         # Store last result
         last_detection_result = result
@@ -429,10 +468,11 @@ def capture_frame_from_stream(stream_url):
 async def root():
     """API information endpoint"""
     return {
-        "service": "Jaundice Detection API",
-        "version": "2.0.0",
+        "service": "Jaundice Detection API with Baby Presence Gate",
+        "version": "2.1.0",
         "status": "running" if model is not None else "error",
         "model_loaded": model is not None,
+        "baby_detector_loaded": baby_detector is not None,
         "device": DEVICE,
         "auto_detection": {
             "enabled": True,
@@ -443,6 +483,12 @@ async def root():
         "thingsboard": {
             "enabled": tb_client.enabled if tb_client else False,
             "connected": tb_client.connected if tb_client else False
+        },
+        "features": {
+            "baby_presence_gate": baby_detector is not None,
+            "face_detection": True,
+            "skin_detection": True,
+            "brightness_check": True
         },
         "endpoints": {
             "/": "API information",
@@ -459,6 +505,7 @@ async def health_check():
     return {
         "status": "healthy" if model is not None else "error",
         "model_loaded": model is not None,
+        "baby_detector_loaded": baby_detector is not None,
         "auto_detection_active": auto_detection_task is not None,
         "thingsboard_connected": tb_client.connected if tb_client else False,
         "timestamp": datetime.now().isoformat()
@@ -478,7 +525,7 @@ async def detect_jaundice():
         if frame is None:
             raise HTTPException(status_code=500, detail="Failed to capture frame from camera")
         
-        # Make prediction
+        # Make prediction (with baby presence gate)
         result = make_prediction(frame)
         
         if result is None:
@@ -487,8 +534,12 @@ async def detect_jaundice():
         result["timestamp"] = datetime.now().isoformat()
         result["detection_type"] = "manual"  # Mark as manual detection
         
-        logger.info(f"✓ Manual detection: {result.get('predicted_class', result.get('status'))} "
-                   f"(confidence: {result['confidence']:.2%})")
+        # Log result with baby presence info
+        if result.get('baby_present'):
+            logger.info(f"✓ Manual detection: {result.get('predicted_class', result.get('status'))} "
+                       f"(confidence: {result['confidence']:.2%}, baby: ✓)")
+        else:
+            logger.info(f"⚠️ Manual detection skipped: {result.get('baby_reason')}")
         
         # Store as last result
         global last_detection_result
@@ -529,20 +580,27 @@ async def model_info():
     return {
         "model_path": MODEL_PATH,
         "model_loaded": model is not None,
+        "baby_detector_loaded": baby_detector is not None,
         "device": DEVICE,
         "image_size": IMG_SIZE,
         "class_names": CLASS_NAMES,
         "model_parameters": model_params,
-        "camera_source": INFANT_CAMERA_URL
+        "camera_source": INFANT_CAMERA_URL,
+        "baby_detection_params": {
+            "min_face_area_ratio": baby_detector.min_face_area_ratio if baby_detector else None,
+            "min_skin_ratio": baby_detector.min_skin_ratio if baby_detector else None,
+            "face_scale_factor": baby_detector.face_scale_factor if baby_detector else None,
+            "face_min_neighbors": baby_detector.face_min_neighbors if baby_detector else None
+        } if baby_detector else None
     }
 
 # --- Startup Event ---
 @app.on_event("startup")
 async def startup_event():
-    """Load model and start auto-detection on startup"""
-    global model, model_params, tb_client, auto_detection_task, baby_detector
+    """Load model, baby detector and start auto-detection on startup"""
+    global model, model_params, baby_detector, tb_client, auto_detection_task
     
-    logger.info("🚀 Starting Jaundice Detection Server...")
+    logger.info("🚀 Starting Jaundice Detection Server with Baby Presence Gate...")
     logger.info(f"📂 Loading model from {MODEL_PATH}")
     
     # Load ML model
@@ -554,12 +612,15 @@ async def startup_event():
         logger.info("✅ Model loaded successfully")
         logger.info(f"📊 Model parameters: {model_params}")
     
-    # Initialize baby presence detector
+    # Load baby presence detector
+    logger.info("👶 Loading baby presence detector...")
     try:
         baby_detector = BabyPresenceDetector()
-        logger.info("✅ Baby presence detector initialized")
+        logger.info("✅ Baby presence detector loaded successfully")
+        logger.info(f"   - Min face area ratio: {baby_detector.min_face_area_ratio}")
+        logger.info(f"   - Min skin ratio: {baby_detector.min_skin_ratio}")
     except Exception as e:
-        logger.warning(f"⚠️ Could not initialize baby detector: {e}")
+        logger.error(f"❌ Failed to load baby presence detector: {e}")
         baby_detector = None
     
     logger.info(f"📹 Using camera stream: {INFANT_CAMERA_URL}")

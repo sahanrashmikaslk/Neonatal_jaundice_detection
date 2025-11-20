@@ -3,10 +3,12 @@ import torch
 import torchvision.models as models
 import torch.nn as nn
 import albumentations as A
+from typing import Optional
 from albumentations.pytorch import ToTensorV2
-from PIL import Image # Pillow for image handling
+from PIL import Image  # Pillow for image handling
 import numpy as np
 import cv2 # OpenCV for video capture and image manipulation
+from baby_presence_detector import BabyPresenceDetector, PresenceResult
 
 # --- Configuration (same as before) ---
 MODEL_PATH = "jaundice_mobilenetv3_robust.pt"
@@ -87,10 +89,15 @@ def check_image_brightness(image_np_bgr):
     brightness = np.mean(gray)
     return brightness
 
-# --- Prediction Function (modified to include confidence based on brightness) ---
-def make_prediction_on_frame(model, frame_np_bgr, model_params):
+# --- Presence detector (cached so it loads once) ---
+@st.cache_resource
+def get_presence_detector():
+    return BabyPresenceDetector()
+
+# --- Prediction Function (modified to include brightness + presence gating) ---
+def make_prediction_on_frame(model, frame_np_bgr, model_params, presence_detector=None):
     if model is None:
-        return None, None, None, None
+        return None, None, None, None, None
     
     # Check brightness
     brightness = check_image_brightness(frame_np_bgr)
@@ -107,12 +114,18 @@ def make_prediction_on_frame(model, frame_np_bgr, model_params):
     
     # If image is too dark, return early with "Too Dark" classification
     if brightness < very_dark_threshold:
-        return "Too Dark", 0, brightness, 0.0
+        return "Too Dark", 0, brightness, 0.0, None
     
     # For low light conditions, we'll still make a prediction but with reduced confidence
     if brightness < low_light_threshold:
         confidence = 0.7  # Reduced confidence for low light conditions
     
+    presence_result: Optional[PresenceResult] = None
+    if presence_detector is not None:
+        presence_result = presence_detector.is_baby_present(frame_np_bgr)
+        if not presence_result.is_present:
+            return "No Baby Detected", 0.0, brightness, 0.0, presence_result
+
     # Preprocess and get model prediction
     img_tensor = preprocess_frame_for_inference(frame_np_bgr)
     with torch.no_grad():
@@ -122,7 +135,7 @@ def make_prediction_on_frame(model, frame_np_bgr, model_params):
     predicted_class_idx = 1 if probability_jaundice > 0.5 else 0
     predicted_class_name = CLASS_NAMES[predicted_class_idx]
     
-    return predicted_class_name, probability_jaundice, brightness, confidence
+    return predicted_class_name, probability_jaundice, brightness, confidence, presence_result
 
 # --- Streamlit UI ---
 st.set_page_config(page_title="Jaundice Detector", layout="wide")
@@ -131,6 +144,7 @@ st.write(f"Utilizing model on device: **{DEVICE.upper()}**")
 st.markdown("Upload an image, use your webcam for a snapshot, or try the live feed detection.")
 
 model, model_params = load_trained_model(MODEL_PATH)
+presence_detector = get_presence_detector()
 
 if model is None:
     st.warning("Model could not be loaded. Please check the console for errors and ensure the model path is correct.")
@@ -157,17 +171,20 @@ input_method = st.sidebar.radio(
 live_frame_placeholder = st.empty()
 live_prediction_placeholder = st.empty()
 
-def display_prediction_text(predicted_class, probability, brightness, confidence, placeholder):
+def display_prediction_text(predicted_class, probability, brightness, confidence, placeholder, presence_result: Optional[PresenceResult]):
     if predicted_class == "Too Dark":
         placeholder.warning(f"**Image Too Dark** (Brightness: {brightness:.2f}). Please use better lighting.")
+    elif predicted_class == "No Baby Detected":
+        reason = f" ({presence_result.reason})" if presence_result and getattr(presence_result, "reason", None) else ""
+        placeholder.warning(f"**No baby detected**{reason}. Skipping jaundice inference.")
     elif predicted_class == "Jaundice":
         if confidence < 1.0:
-            placeholder.error(f"**{predicted_class} Detected** (Confidence: {probability:.2%}, Brightness: {brightness:.2f})\n⚠️ **Reliability: {confidence:.2%}** - Low light may affect accuracy")
+            placeholder.error(f"**{predicted_class} Detected** (Confidence: {probability:.2%}, Brightness: {brightness:.2f})\nReliability: {confidence:.2%} - Low light may affect accuracy")
         else:
             placeholder.error(f"**{predicted_class} Detected** (Confidence: {probability:.2%}, Brightness: {brightness:.2f})")
-    else: # Normal
+    else:  # Normal
         if confidence < 1.0:
-            placeholder.success(f"**{predicted_class}** (Confidence for Jaundice: {probability:.2%}, Brightness: {brightness:.2f})\n⚠️ **Reliability: {confidence:.2%}** - Low light may affect accuracy")
+            placeholder.success(f"**{predicted_class}** (Confidence for Jaundice: {probability:.2%}, Brightness: {brightness:.2f})\nReliability: {confidence:.2%} - Low light may affect accuracy")
         else:
             placeholder.success(f"**{predicted_class}** (Confidence for Jaundice: {probability:.2%}, Brightness: {brightness:.2f})")
 
@@ -188,9 +205,9 @@ if input_method == "Upload an Image":
             with st.spinner("Analyzing..."):
                 img_np = np.array(image.convert("RGB"))
                 img_np_bgr_for_func = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-                predicted_class, probability, brightness, confidence = make_prediction_on_frame(model, img_np_bgr_for_func, model_params)
+                predicted_class, probability, brightness, confidence, presence_result = make_prediction_on_frame(model, img_np_bgr_for_func, model_params, presence_detector)
                 if predicted_class is not None:
-                    display_prediction_text(predicted_class, probability, brightness, confidence, live_prediction_placeholder)
+                    display_prediction_text(predicted_class, probability, brightness, confidence, live_prediction_placeholder, presence_result)
                 else:
                     live_prediction_placeholder.error("Could not make a prediction.")
 
@@ -211,9 +228,9 @@ elif input_method == "Use Webcam Snapshot":
             with st.spinner("Analyzing..."):
                 img_np = np.array(image.convert("RGB"))
                 img_np_bgr_for_func = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-                predicted_class, probability, brightness, confidence = make_prediction_on_frame(model, img_np_bgr_for_func, model_params)
+                predicted_class, probability, brightness, confidence, presence_result = make_prediction_on_frame(model, img_np_bgr_for_func, model_params, presence_detector)
                 if predicted_class is not None:
-                    display_prediction_text(predicted_class, probability, brightness, confidence, live_prediction_placeholder)
+                    display_prediction_text(predicted_class, probability, brightness, confidence, live_prediction_placeholder, presence_result)
                 else:
                     live_prediction_placeholder.error("Could not make a prediction.")
 
@@ -255,12 +272,16 @@ elif input_method == "Live Feed Detection":
                 st.rerun()
                 break
 
-            predicted_class, probability, brightness, confidence = make_prediction_on_frame(model, frame, model_params)
+            predicted_class, probability, brightness, confidence, presence_result = make_prediction_on_frame(model, frame, model_params, presence_detector)
             
             # Determine text color based on prediction
             if predicted_class == "Too Dark":
                 color = (0, 165, 255)  # Orange in BGR
                 display_text = f"Too Dark (Brightness: {brightness:.2f})"
+            elif predicted_class == "No Baby Detected":
+                color = (0, 165, 255)  # Orange in BGR
+                reason = f" ({presence_result.reason})" if presence_result and getattr(presence_result, "reason", None) else ""
+                display_text = f"No Baby{reason}"
             elif predicted_class == "Jaundice":
                 color = (0, 0, 255)  # Red in BGR
                 display_text = f"{predicted_class} ({probability:.2%})"
