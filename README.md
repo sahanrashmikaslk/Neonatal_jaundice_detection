@@ -1,8 +1,9 @@
-# Advanced Neonatal Jaundice Detection System
+# Neonatal Jaundice Detection System
 
 ## Project Overview
 
-This project implements a state-of-the-art **dual-head multi-task learning** system for detecting neonatal jaundice from images of infant eyes. The system simultaneously performs jaundice detection and image quality assessment, providing reliable and transparent predictions even under challenging lighting conditions.
+This project implements a state-of-the-art **dual-head multi-task learning** system for detecting neonatal jaundice from images of infant. The system simultaneously performs jaundice detection and image quality assessment, providing reliable and transparent predictions even under challenging lighting conditions.
+The model was developed for our final-year research project, **Development of an Automated Condition Controlling and Monitoring System for an Infant Incubator**.
 
 ### Key Innovation: Dual-Head Multi-Task Learning
 
@@ -49,7 +50,7 @@ MobileNetV3-Small Backbone (Pretrained on ImageNet)
 
 ## Training Pipeline Deep Dive
 
-The complete training workflow is implemented in `jaundice-detection.ipynb` with 12 well-documented cells:
+The complete training workflow is implemented in `jaundice-detection.ipynb` with 12 documented cells:
 
 ### 1. **Kaggle API Setup**
 
@@ -187,16 +188,16 @@ The application uses the quality head to provide context-aware results:
 def display_prediction(jaundice_prob, quality_prob, threshold=0.5):
     if quality_prob < 0.3:
         # Red warning: Image quality too poor for reliable diagnosis
-        st.error("⚠️ Image Quality Too Low - Cannot Provide Reliable Diagnosis")
+        st.error("Image Quality Too Low - Cannot Provide Reliable Diagnosis")
     elif jaundice_prob > threshold:
         # Orange alert: Jaundice detected
         if quality_prob < 0.7:
-            st.warning(f"⚠️ Jaundice Detected (Confidence: Medium - Quality: {quality_prob:.2f})")
+            st.warning(f"Jaundice Detected (Confidence: Medium - Quality: {quality_prob:.2f})")
         else:
-            st.error(f"🔴 Jaundice Detected (Confidence: High - Quality: {quality_prob:.2f})")
+            st.error(f"Jaundice Detected (Confidence: High - Quality: {quality_prob:.2f})")
     else:
         # Green confirmation: Normal
-        st.success(f"✅ Normal (Quality: {quality_prob:.2f})")
+        st.success(f"Normal (Quality: {quality_prob:.2f})")
 ```
 
 ### Live Feed Enhancements
@@ -321,13 +322,13 @@ streamlit run app.py
 ### Understanding Outputs
 
 - **"Normal":** No jaundice detected (Green indicator)
-  - High quality (>0.7): ✅ Full confidence
-  - Medium quality (0.3-0.7): ⚠️ Moderate confidence
+  - High quality (>0.7): Full confidence
+  - Medium quality (0.3-0.7): Moderate confidence
 - **"Jaundice":** Potential jaundice detected (Red/Orange indicator)
-  - High quality (>0.7): 🔴 High confidence alert
-  - Medium quality (0.3-0.7): ⚠️ Medium confidence warning
+  - High quality (>0.7): High confidence alert
+  - Medium quality (0.3-0.7): Medium confidence warning
 - **"Poor Quality":** Image quality too low (<0.3)
-  - ⚠️ Cannot provide reliable diagnosis
+  - Cannot provide reliable diagnosis
 - **Quality Score:** Learned assessment of image suitability (0-1 scale)
 
 ## Technical Innovations
@@ -400,9 +401,19 @@ Enables deployment with both predictions in a single inference call.
 - **Quality-Aware Decisions:** Use quality score to gate predictions
 - **Comprehensive Logging:** Track both predictions for audit trails
 
-## Performance Metrics
+## Performance Metrics (latest run)
 
-The dual-head multi-task model demonstrates:
+- **Train config:** up to 50 epochs with early stopping (patience=5); best run stopped around epoch ~32.
+- **Eval split (threshold = 0.80, 114 samples):**
+  - Accuracy: **0.930**
+  - Sensitivity (TPR): **0.813**
+  - Specificity (TNR): **0.976**
+  - ROC AUC: **0.974**
+  - PR AUC: **0.932**
+  - Confusion counts: **TN=80, FP=2, FN=6, TP=26**
+- Files: see `performance_evaluation/metrics_20251128_134906.csv` and plots in `performance_evaluation/`.
+
+The model demonstrates:
 
 - **Joint Learning Benefits:** Quality assessment improves jaundice detection
 - **Learned Quality:** Generalizes beyond simple brightness thresholds
@@ -410,46 +421,7 @@ The dual-head multi-task model demonstrates:
 - **Efficient Inference:** Single forward pass for both tasks
 - **Improved Reliability:** Quality-aware confidence scoring reduces false positives
 
-### Typical Performance
-
-- **Jaundice Detection:**
-  - Accuracy: ~85-90%
-  - Sensitivity: ~80-85%
-  - Specificity: ~90-95%
-- **Quality Assessment:**
-  - Correctly identifies low-quality images
-  - Correlates with manual brightness assessment
-  - Improves trust in high-quality predictions
-
-## Contributing
-
-This project welcomes contributions in:
-
-- **Model Improvements:**
-  - Additional quality factors beyond brightness
-  - Multi-class severity grading
-  - Uncertainty quantification techniques
-- **Training Enhancements:**
-  - Advanced data augmentation strategies
-  - Class balancing techniques
-  - Multi-head loss weighting optimization
-- **Application Features:**
-  - Enhanced visualization of quality factors
-  - Batch processing capabilities
-  - Export functionality for clinical records
-- **Validation Studies:**
-  - Clinical validation datasets
-  - Cross-dataset generalization testing
-  - Real-world deployment case studies
-- **Performance Optimization:**
-  - Model quantization for edge devices
-  - Inference speed improvements
-  - Mobile deployment (TensorFlow Lite, CoreML)
-
 ## Medical Disclaimer
 
 This system is designed for **research and educational purposes**. It should not replace professional medical diagnosis. Always consult qualified healthcare providers for medical decisions regarding neonatal jaundice.
-
-## Contact & Support
-
-For questions, issues, or collaboration opportunities, please reach out through the project repository or contact the development team.
+.
